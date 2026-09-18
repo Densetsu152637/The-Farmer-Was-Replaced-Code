@@ -1,14 +1,18 @@
 import heap
-known_petals = heap.create_heap()
 
-def get_petal_size(e):
-	return e[0]
-
-def add_to_collection():
-	global known_petals
-	value = [measure(), [get_pos_x(), get_pos_y()]]
-	heap.heap_push(known_petals, value, get_petal_size)
-	
-def get_end():
-	global known_petals
-	return heap.heap_pop(known_petals)
+def extract_duplicate_max_values(petals):
+    ret = []
+    
+    max = heap.heap_peek(petals)[0]
+    
+    while petals["size"] > 0:
+        next = heap.heap_peek(petals)
+        if next[0] < max:
+            break
+        ret.append(next)
+        heap.heap_pop(petals)
+        
+    return ret
+        
+    
+    

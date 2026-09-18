@@ -3,78 +3,56 @@ import util
 def sort_cactus_grid():
 	size = get_world_size()
 	
-	# --- PHASE 1: Zero-Waste Localized Cluster Sorting ---
-	# Step through the grid in steps of 4 to handle distinct blocks
-	for y_quad in range(0, size, 4):
-		for x_quad in range(0, size, 4):
-			optimize_2x2_cluster(x_quad, y_quad, size)
-			
 	# --- PHASE 2: Shaker Sort Every Row ---
 	# Uses dynamic bound contraction to instantly clip sorted ends
+	row_jobs = []
 	for y in range(size):
-		shaker_sort_row(y, size)
+		row_jobs.append((y, size))
+	util.parallel_map(_sort_row_job, row_jobs)
 		
 	# --- PHASE 3: Shaker Sort Every Column ---
 	# Uses dynamic bound contraction to instantly clip sorted ends
+	column_jobs = []
 	for x in range(size):
-		shaker_sort_column(x, size)
+		column_jobs.append((x, size))
+	util.parallel_map(_sort_column_job, column_jobs)
 			
-	# --- PHASE 4: Global Merge Validation Pass ---
-	# The pre-sorted clusters allow the validation pass to clear rapidly
-	while gnome_validation_sweep(size):
-		continue
+	# Row and column sorting are complete global barriers: each row and then
+	# each column is monotone, so a row-major gnome pass would only undo the
+	# column ordering and is intentionally omitted.
 
 
-def optimize_2x2_cluster(cx, cy, size):
-	# Safe boundary lookaheads
-	has_east = (cx + 1) < size
-	has_north = (cy + 1) < size
+def sort_one_row(y, size):
+	# Rows are disjoint ownership units; the column phase starts only after
+	# every row worker has joined.
+	shaker_sort_row(y, size)
 
-	# Execute 2 localized sorting iterations directly over the local loop path
-	# This avoids fancy memory sorting arrays that the game parser struggles with
-	for pass_num in range(2):
-		# Step A: Check and swap Bottom Row horizontally
-		if has_east:
-			util.go_to(cx, cy)
-			left_sz = measure()
-			util.go_to(cx + 1, cy)
-			right_sz = measure()
-			if left_sz > right_sz:
-				util.go_to(cx, cy)
-				swap(East)
 
-		# Step B: Check and swap Right Column vertically
-		if has_east and has_north:
-			util.go_to(cx + 1, cy)
-			bottom_sz = measure()
-			util.go_to(cx + 1, cy + 1)
-			top_sz = measure()
-			if bottom_sz > top_sz:
-				util.go_to(cx + 1, cy)
-				swap(North)
+def _sort_row_job(job):
+	sort_one_row(job[0], job[1])
 
-		# Step C: Check and swap Top Row horizontally
-		if has_east and has_north:
-			util.go_to(cx, cy + 1)
-			left_sz = measure()
-			util.go_to(cx + 1, cy + 1)
-			right_sz = measure()
-			if left_sz > right_sz:
-				util.go_to(cx, cy + 1)
-				swap(East)
 
-		# Step D: Check and swap Left Column vertically
-		if has_north:
-			util.go_to(cx, cy)
-			bottom_sz = measure()
-			util.go_to(cx, cy + 1)
-			top_sz = measure()
-			if bottom_sz > top_sz:
-				util.go_to(cx, cy)
-				swap(North)
+def sort_one_column(x, size):
+	shaker_sort_column(x, size)
+
+
+def _sort_column_job(job):
+	sort_one_column(job[0], job[1])
 
 
 def shaker_sort_row(y, size):
+	for end in range(size - 1, 0, -1):
+		for x in range(end):
+			util.go_to(x, y)
+			left = measure()
+			util.go_to(x + 1, y)
+			right = measure()
+			if left > right:
+				util.go_to(x, y)
+				swap(East)
+	return
+
+def _legacy_shaker_sort_row(y, size):
 	# Row Shaker Sort: Compresses borders to the exact last swapped index
 	start = 0
 	end = size - 1
@@ -121,6 +99,18 @@ def shaker_sort_row(y, size):
 
 
 def shaker_sort_column(x, size):
+	for end in range(size - 1, 0, -1):
+		for y in range(end):
+			util.go_to(x, y)
+			bottom = measure()
+			util.go_to(x, y + 1)
+			top = measure()
+			if bottom > top:
+				util.go_to(x, y)
+				swap(North)
+	return
+
+def _legacy_shaker_sort_column(x, size):
 	# Column Shaker Sort: Compresses borders to the exact last swapped index
 	start = 0
 	end = size - 1

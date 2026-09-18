@@ -7,7 +7,8 @@ STATE = {
 	"length": 0,
 	"active": False,
 	"size": 0,
-	"capacity": 0
+	"capacity": 0,
+	"steps_without_apple": 0
 }
 
 BODY = []
@@ -44,9 +45,10 @@ def decode_y(position):
 
 
 def initialise_body():
+	global BODY
 	size = STATE["size"]
 
-	BODY.clear()
+	BODY = []
 
 	for x in range(size):
 		column = []
@@ -58,10 +60,12 @@ def initialise_body():
 
 
 def initialise_hamiltonian():
+	global HAMILTONIAN
+	global HAM_INDEX
 	size = STATE["size"]
 
-	HAMILTONIAN.clear()
-	HAM_INDEX.clear()
+	HAMILTONIAN = []
+	HAM_INDEX = []
 
 	for x in range(size):
 		direction_column = []
@@ -128,6 +132,12 @@ def reset_dino_state():
 	STATE["active"] = True
 	STATE["size"] = get_world_size()
 	STATE["capacity"] = STATE["size"] * STATE["size"]
+	STATE["steps_without_apple"] = 0
+
+	# A non-wrapping odd square has no Hamiltonian cycle.
+	if STATE["size"] < 2 or STATE["size"] % 2 != 0:
+		STATE["active"] = False
+		return
 
 	initialise_body()
 	initialise_hamiltonian()
@@ -219,15 +229,38 @@ def cycle_distance(start_index, end_index):
 
 
 def hamiltonian_shortcut_safe(x, y, growing):
-	# Empty tail means every legal shortcut is safe.
-	if TAIL["size"] == 0:
-		return True
-
 	head_x = get_pos_x()
 	head_y = get_pos_y()
 
 	head_index = HAM_INDEX[head_x][head_y]
 	target_index = HAM_INDEX[x][y]
+	target_distance = cycle_distance(head_index, target_index)
+	if target_distance == 0:
+		return False
+	# As the board fills, stop cutting across unused cycle sections.
+	# Leave space to grow and let the tail settle onto the full cycle.
+	if STATE["length"] + 1 >= STATE["capacity"] // 2:
+		if target_distance != 1:
+			return False
+
+	# Without a known apple, follow the cycle to discover one.
+	apple_x = STATE["apple_x"]
+	apple_y = STATE["apple_y"]
+	if apple_x < 0 or apple_y < 0:
+		if target_distance != 1:
+			return False
+	else:
+		# Never skip the food in cycle order. Tail safety alone allows
+		# endless short loops which keep overtaking the same apple.
+		apple_index = HAM_INDEX[apple_x][apple_y]
+		apple_distance = cycle_distance(head_index, apple_index)
+		if target_distance > apple_distance:
+			return False
+
+	if TAIL["size"] == 0:
+		if growing and target_distance > 1:
+			return STATE["capacity"] - target_distance > 4
+		return True
 
 	oldest = tail_front()
 
@@ -236,15 +269,16 @@ def hamiltonian_shortcut_safe(x, y, growing):
 
 	tail_index = HAM_INDEX[tail_x][tail_y]
 
-	# Distance forward from the head to the candidate tile.
-	target_distance = cycle_distance(head_index, target_index)
-
 	# Distance forward from the head to the tail.
 	tail_distance = cycle_distance(head_index, tail_index)
-
-	# A zero distance means staying on the current tile.
-	if target_distance == 0:
-		return False
+	# Keep a growth buffer when cutting across the cycle. Ordinary
+	# successor moves remain available while the tail closes old gaps.
+	if target_distance > 1:
+		buffer = 3
+		if growing:
+			buffer += 1
+		if tail_distance - target_distance <= buffer:
+			return False
 
 	# The shortcut must stay before the tail in Hamiltonian order.
 	#
@@ -273,7 +307,10 @@ def candidate_is_safe(direction, growing):
 
 
 def apple_distance(x, y):
-	return abs(STATE["apple_x"] - x) + abs(STATE["apple_y"] - y)
+	# Rank progress along the cycle, not geometric closeness to the apple.
+	if STATE["apple_x"] < 0 or STATE["apple_y"] < 0:
+		return STATE["capacity"]
+	return cycle_distance(HAM_INDEX[x][y], HAM_INDEX[STATE["apple_x"]][STATE["apple_y"]])
 
 
 def shortcut_direction(growing):
@@ -388,19 +425,32 @@ def fallback_direction(growing):
 def dino_walk():
 	if not STATE["active"]:
 		reset_dino_state()
+		if not STATE["active"]:
+			return False
 
 	eating_apple = get_entity_type() == Entities.Apple
 
 	# measure() on the current apple gives the next apple.
 	if eating_apple:
 		pos = measure()
+		if pos == None:
+			STATE["active"] = False
+			return False
 
 		STATE["apple_x"] = pos[0]
 		STATE["apple_y"] = pos[1]
+		STATE["steps_without_apple"] = 0
+	else:
+		# One full cycle must find food. Stop if no apple was spawned
+		# (for example, cactus ran out), rather than orbiting forever.
+		STATE["steps_without_apple"] += 1
+		if STATE["steps_without_apple"] > STATE["capacity"]:
+			STATE["active"] = False
+			return False
 
 	# Always look for a Hamiltonian-safe shortcut.
 	#
-	# This is no longer limited to short tails.
+	# Long tails use only the ordinary cycle successor.
 	direction = shortcut_direction(eating_apple)
 
 	if direction != 0:
