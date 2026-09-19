@@ -39,7 +39,8 @@ def get_target_key(d):
 		cx += 1
 	elif d == West:
 		cx -= 1
-	return str(cx) + "_" + str(cy)
+	size = get_world_size()
+	return str(cx % size) + "_" + str(cy % size)
 
 def register_visit():
 	#Locks current coordinates into memory.
@@ -64,71 +65,111 @@ def pop_return_path():
 	return None
 
 
-def maze_branch_worker(first_direction):
+def maze_branch_worker(first_direction=None, blocked=None):
+	# Each drone owns its visited set. Pass ancestor visits explicitly so a
+	# child cannot turn back into work already assigned above its fork.
 	visited = dict()
+	if blocked != None:
+		visited = dict(blocked)
+	visited[get_current_key()] = True
 	path = []
-	child_handles = []
-	child_prefixes = []
+	handles = []
+	prefixes = []
 	best_route = None
-	directions_local = [North, East, South, West]
-	backs = [South, West, North, East]
-	visited[str(get_pos_x()) + "," + str(get_pos_y())] = True
-	if not move(first_direction):
-		return None
-	path.append(first_direction)
+	failed = False
+	if first_direction != None:
+		if not move(first_direction):
+			return None
+		path.append(first_direction)
+	branch_depth = len(path)
+
 	while True:
-		key = str(get_pos_x()) + "," + str(get_pos_y())
-		visited[key] = True
+		visited[get_current_key()] = True
 		if get_entity_type() == Entities.Treasure:
-			best_route = []
-			for direction in path:
-				best_route.append(direction)
+			best_route = list(path)
 			break
-		moved = False
 		choices = []
-		for i in range(4):
-			d = directions_local[i]
-			tx, ty = get_pos_x(), get_pos_y()
-			if d == North:
-				ty += 1
-			elif d == South:
-				ty -= 1
-			elif d == East:
-				tx += 1
-			else:
-				tx -= 1
-			target = str(tx) + "," + str(ty)
-			if can_move(d) and not (target in visited):
-				choices.append((d, target))
-		if len(choices) > 1:
-			delegated = []
-			for d, target in choices[1:]:
-				child = spawn_drone(maze_branch_worker, d)
-				if child != None:
-					child_handles.append(child)
-					child_prefixes.append(list(path))
-					visited[target] = True
-				else:
-					delegated.append((d, target))
-			choices = choices[:1] + delegated
+		for direction in directions:
+			target = get_target_key(direction)
+			if target not in visited and can_move(direction):
+				choices.append((direction, target))
+
+		# Keep one branch for this drone; delegate siblings at the junction.
+		for index in range(1, len(choices)):
+			direction, target = choices[index]
+			child = spawn_drone(maze_branch_worker, direction, visited)
+			if child != None:
+				handles.append(child)
+				prefixes.append(list(path))
+				visited[target] = True
+
 		if len(choices) > 0:
-			d, target = choices[0]
-			move(d)
-			path.append(d)
-			moved = True
-		if not moved:
-			if len(path) == 1:
-				last_direction = path.pop()
-				move(back_direction(last_direction))
-				break
-			last_direction = path.pop()
-			move(back_direction(last_direction))
-	for i in range(len(child_handles)):
-		result = wait_for(child_handles[i])
+			direction, target = choices[0]
+			if move(direction):
+				path.append(direction)
+			else:
+				visited[target] = True
+			continue
+
+		# The branch is exhausted. Leave the caller's junction untouched.
+		if len(path) == branch_depth:
+			break
+		if not move(back_direction(path.pop())):
+			failed = True
+			break
+
+	# Never destroy the maze while any descendant is still navigating it.
+	for index in range(len(handles)):
+		result = wait_for(handles[index])
 		if result != None and best_route == None:
-			best_route = child_prefixes[i] + result
-	if best_route == None:
+			best_route = prefixes[index] + result
+	# Every worker returns to its spawn position, even after a local find.
+	while len(path) > 0:
+		if not move(back_direction(path.pop())):
+			failed = True
+			break
+	if failed:
 		return None
-	for i in range(len(path) - 1, -1, -1):
-		move(back_direction(path[i]))
 	return best_route
+
+
+def maze_substance_cost():
+	level = num_unlocked(Unlocks.Mazes)
+	if level < 1:
+		return 0
+	return get_world_size() * 2 ** (level - 1)
+
+
+def create_maze():
+	amount = maze_substance_cost()
+	if amount == 0 or num_items(Items.Weird_Substance) < amount:
+		return False
+	# Existing mazes must be solved before attempting ordinary navigation.
+	if get_entity_type() == Entities.Hedge or get_entity_type() == Entities.Treasure:
+		return False
+	centre = get_world_size() // 2
+	util.go_to(centre, centre)
+	util.harvest_if_not(Entities.Bush)
+	if get_entity_type() != Entities.Bush:
+		if not plant(Entities.Bush):
+			return False
+	if not use_item(Items.Weird_Substance, amount):
+		return False
+	return get_entity_type() == Entities.Hedge or get_entity_type() == Entities.Treasure
+
+
+def solve_maze():
+	# Search without harvesting, then follow the winning route after all joins.
+	if get_entity_type() != Entities.Hedge and get_entity_type() != Entities.Treasure:
+		return False
+	route = maze_branch_worker()
+	if route == None:
+		return False
+	for direction in route:
+		if not move(direction):
+			return False
+	if get_entity_type() != Entities.Treasure:
+		return False
+	before = num_items(Items.Gold)
+	harvest()
+	return num_items(Items.Gold) > before

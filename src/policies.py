@@ -150,22 +150,17 @@ def weird_substance_policy():
 			break
 
 
-# in-progress
+# in-progress	
 def treasure_policy():
-    
-	while util.lacks_item(Items.Weird_Substance) and util.has_some(Items.Fertilizer) and sufficient_power():
-		# go to the centre of the farm to spawn the giant maze
-		halfway = get_world_size() / 2
-		util.go_to(halfway, halfway)
-		# spawn giant maze
-		util.till_if_required(Grounds.Soil)
-		if not plant(Entities.Bush):
+	# Repeat complete create/search/join/harvest runs until the gold target.
+	while util.lacks_item(Items.Gold) and not util.has_some(Items.Weird_Substance) and util.has_some(Items.Fertilizer) and sufficient_power():
+		if not treasure_util.create_maze():
 			return False
-		if not use_item(Items.Weird_Substance, maze_amount):
+		if not treasure_util.solve_maze():
 			return False
-  		# put drone solving multithreaded DFS behaviour here TODO
-		
-  
+	return not util.lacks_item(Items.Gold)
+
+
 # finished
 def dinosaur_policy():
 	# Pre-flight checks.
