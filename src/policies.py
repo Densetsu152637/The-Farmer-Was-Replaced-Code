@@ -7,14 +7,14 @@ import substance_util
 import treasure_util
 import dino_util
 import heap
-import pumpkin_util
 
 def sufficient_power():
 	return not util.shortage_of(Items.Power)
 
+
 # finished
 def power_policy():	
-    
+	
 	def sunflower_region(region):
 		local_petals = heap.create_heap()
 		util.action_per_region(planting.farm_sunflower_worker(local_petals), region)
@@ -25,7 +25,7 @@ def power_policy():
 		while not can_harvest():
 			continue
 		harvest()
-    
+	
 	while util.lacks_item(Items.Power): 
 		# plant all initial sunflowers
 		heaps = util.run_parallel_regions(sunflower_region)
@@ -38,18 +38,20 @@ def power_policy():
 			max_petals = sunflower_util.extract_duplicate_max_values(known_petals)		
 			util.parallel_map(go_to_and_harvest, max_petals)
 
+
 # finished
 def hay_policy():
-    
+	
 	def hay_region(region):
 		while util.lacks_item(Items.Hay) and sufficient_power():
 			util.action_per_region(planting.farm_hay_tile, region)
-    
+	
 	util.run_parallel_regions(hay_region)
 		
+  
 # finished
 def wood_policy():
-    
+	
 	def wood_region(region):
 		while util.lacks_item(Items.Wood) and sufficient_power():
 			util.action_per_region(planting.farm_wood_tile, region)
@@ -65,55 +67,63 @@ def carrot_policy():
 	  
 	util.run_parallel_regions(carrot_region)		
 		
-# in-progress
+  
+# finished
 def pumpkin_policy():	
+	
+	def pumpkin_plant_region(region):
+		util.action_per_region(planting.farm_pumpkin, region)
+		# go through the pumpkins and replace broken ones with fresh ones
+		dead_pumpkins = queue.create_circular_queue(region["size"][0] * region["size"][1])
+		for pos in util.generate_tile_sequence(region["start"], region["size"]):
+			queue.enqueue(dead_pumpkins, pos)
+		
+		while dead_pumpkins["size"] > 0:
+			next_tile = queue.dequeue(dead_pumpkins)
+			util.go_to_coord(next_tile)
+   
+			# If a pumpkin died, replant it and put it back in the queue to check later
+			if get_entity_type() == Entities.Dead_Pumpkin:
+				harvest()
+				plant(Entities.Pumpkin)
+				util.water_if_possible()
+				queue.enqueue(dead_pumpkins, next_tile)
+				
+			# If it is alive but NOT ready to harvest, skip it for now and re-queue it
+			elif not can_harvest():
+				queue.enqueue(dead_pumpkins, next_tile)
+				
+			# If can_harvest() is true and it's not dead, it's fully grown! 
+			# Leave it standing so it can merge into a giant pumpkin.
+			else:
+				pass 	
+
+		# all pumpkins are ready to be harvested (one giant one)
+
+	
 	while util.lacks_item(Items.Pumpkin) and not util.shortage_of(Items.Carrot) and sufficient_power():
 		# plant all initial pumpkins
 		# Planting is independent by row; the queue/giant-pumpkin phase below
 		# remains serialized so no two drones replant the same tile.
-		util.run_parallel_regions(planting.farm_pumpkin)
-		# Region workers repair/check one disjoint band each. The parent repeats
-		# rounds until every worker reports readiness, then performs one harvest.
-		pending = []
-		results = util.parallel_map(pumpkin_util.pumpkin_region, util.region_bounds(max_drones()))
-		for result in results:
-			if result == None:
-				return False
-			if result == True or result == False:
-				continue
-			for coord in result:
-				pending.append(coord)
-		while len(pending) > 0:
-			chunks = []
-			count = max_drones()
-			for i in range(count):
-				x0 = (len(pending) * i) // count
-				x1 = (len(pending) * (i + 1)) // count
-				if x0 < x1:
-					chunks.append(pending[x0:x1])
-			results = util.parallel_map(pumpkin_util.pumpkin_pending_region, chunks)
-			pending = []
-			for result in results:
-				if result == None:
-					return False
-				if result == True or result == False:
-					continue
-				for coord in result:
-					pending.append(coord)
-
-		# harvest giant pumpkin
+		util.run_parallel_regions(pumpkin_plant_region)
+		# harvest giant pumpkin			
+		util.go_to(0, 0)
 		harvest()
-		util.reposition()
 
-# in-progress
+
+# finished
 def cactus_policy():
+    
+	def cactus_plant_region(region):
+		util.action_per_region(planting.farm_carrot_tile, region)
+    
 	while util.lacks_item(Items.Cactus) and sufficient_power():
 		# Step 1: Plant the entire grid with cactus
 		# Cactus sorting is global, but row ownership makes planting safe.
-		util.run_parallel_regions(planting.plant_cactus)
+		util.run_parallel_regions(cactus_plant_region)
 		
 		# Step 2: Queue all coordinates to monitor maturity
-		util.go_to_coord((0, 1))
+		util.go_to(0, 1)
 		while not can_harvest():
 			continue
 		
@@ -121,12 +131,10 @@ def cactus_policy():
 		cacti_util.sort_cactus_grid()
 		
 		# Step 4: Harvest a single tile to trigger the massive recursive chain reaction
-		util.go_to_coord((0, 0))
+		util.go_to(0, 0)
 		harvest()
 		
-		# Final reset/cleanup pass
-		util.reposition()
-		
+  
 # in-progress	
 def weird_substance_policy():
 	while util.lacks_item(Items.Weird_Substance) and util.has_some(Items.Fertilizer) and sufficient_power():
@@ -141,42 +149,23 @@ def weird_substance_policy():
 		if failed:
 			break
 
+
 # in-progress
 def treasure_policy():
-	world = get_world_size()
-	upgrade = num_unlocked(Unlocks.Mazes)
-	if upgrade < 1:
-		upgrade = 1
-	maze_amount = world * 2 ** (upgrade - 1)
-	# One fresh full-field maze is acyclic. Workers own disjoint DFS branches;
-	# none may harvest, so the parent can join all workers before one harvest.
-	util.reposition()
-	util.harvest_if()
-	util.till_if_required(Grounds.Soil)
-	if not plant(Entities.Bush):
-		return False
-	if not use_item(Items.Weird_Substance, maze_amount):
-		return False
-	directions = [North, East, South, West]
-	root_jobs = []
-	for direction in directions:
-		if not can_move(direction):
-			continue
-		root_jobs.append(direction)
-	results = util.parallel_map(treasure_util.maze_branch_worker, root_jobs)
-	route = None
-	for result in results:
-		if route == None:
-			route = result
-	if route == None:
-		return False
-	for direction in route:
-		move(direction)
-	if get_entity_type() == Entities.Treasure:
-		harvest()
-	util.reposition()
-	return True
+    
+	while util.lacks_item(Items.Weird_Substance) and util.has_some(Items.Fertilizer) and sufficient_power():
+		# go to the centre of the farm to spawn the giant maze
+		halfway = get_world_size() / 2
+		util.go_to(halfway, halfway)
+		# spawn giant maze
+		util.till_if_required(Grounds.Soil)
+		if not plant(Entities.Bush):
+			return False
+		if not use_item(Items.Weird_Substance, maze_amount):
+			return False
+  		# put drone solving multithreaded DFS behaviour here TODO
 		
+  
 # finished
 def dinosaur_policy():
 	# Pre-flight checks.

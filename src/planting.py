@@ -23,6 +23,7 @@ def farm_pumpkin():
 	util.harvest_if_not(Entities.Pumpkin)
 	util.till_if_required(Grounds.Soil)
 	plant(Entities.Pumpkin)
+	util.water_if_possible()
 	
 def farm_sunflower_worker(local_petals):
 	def f():
