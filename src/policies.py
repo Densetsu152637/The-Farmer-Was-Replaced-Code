@@ -12,7 +12,7 @@ import pumpkin_util
 def sufficient_power():
 	return not util.shortage_of(Items.Power)
 
-
+# finished
 def power_policy():	
     
 	def sunflower_region(region):
@@ -38,7 +38,7 @@ def power_policy():
 			max_petals = sunflower_util.extract_duplicate_max_values(known_petals)		
 			util.parallel_map(go_to_and_harvest, max_petals)
 
-
+# finished
 def hay_policy():
     
 	def hay_region(region):
@@ -47,8 +47,7 @@ def hay_policy():
     
 	util.run_parallel_regions(hay_region)
 		
-
-
+# finished
 def wood_policy():
     
 	def wood_region(region):
@@ -57,7 +56,7 @@ def wood_policy():
   
 	util.run_parallel_regions(wood_region)
 		
-		
+# finished		
 def carrot_policy():
   
 	def carrot_region(region):
@@ -66,7 +65,7 @@ def carrot_policy():
 	  
 	util.run_parallel_regions(carrot_region)		
 		
-
+# in-progress
 def pumpkin_policy():	
 	while util.lacks_item(Items.Pumpkin) and not util.shortage_of(Items.Carrot) and sufficient_power():
 		# plant all initial pumpkins
@@ -106,7 +105,7 @@ def pumpkin_policy():
 		harvest()
 		util.reposition()
 
-
+# in-progress
 def cactus_policy():
 	while util.lacks_item(Items.Cactus) and sufficient_power():
 		# Step 1: Plant the entire grid with cactus
@@ -128,7 +127,7 @@ def cactus_policy():
 		# Final reset/cleanup pass
 		util.reposition()
 		
-		
+# in-progress	
 def weird_substance_policy():
 	while util.lacks_item(Items.Weird_Substance) and util.has_some(Items.Fertilizer) and sufficient_power():
 		results = util.parallel_map(substance_util.substance_worker,
@@ -142,7 +141,7 @@ def weird_substance_policy():
 		if failed:
 			break
 
-
+# in-progress
 def treasure_policy():
 	world = get_world_size()
 	upgrade = num_unlocked(Unlocks.Mazes)
@@ -178,7 +177,7 @@ def treasure_policy():
 	util.reposition()
 	return True
 		
-
+# finished
 def dinosaur_policy():
 	# Pre-flight checks.
 	util.reset_farm()

@@ -1,0 +1,82 @@
+[
+  {
+    "layout": "baseline",
+    "cutoff": 0.25,
+    "ranking": "cycle",
+    "start_seed": 0,
+    "seeds": 8,
+    "mean_moves": 167114.5,
+    "median_moves": 166705.0,
+    "moves": [
+      163400,
+      170319,
+      165318,
+      168233,
+      167164,
+      171420,
+      164816,
+      166246
+    ],
+    "failures": []
+  },
+  {
+    "layout": "prim",
+    "cutoff": 0.25,
+    "ranking": "cycle",
+    "start_seed": 0,
+    "seeds": 8,
+    "mean_moves": 168088.125,
+    "median_moves": 167943.0,
+    "moves": [
+      172897,
+      171728,
+      165843,
+      158098,
+      167398,
+      172855,
+      167840,
+      168046
+    ],
+    "failures": []
+  },
+  {
+    "layout": "dfs",
+    "cutoff": 0.25,
+    "ranking": "cycle",
+    "start_seed": 0,
+    "seeds": 8,
+    "mean_moves": 172186.25,
+    "median_moves": 172532.5,
+    "moves": [
+      174346,
+      171221,
+      164854,
+      172190,
+      177068,
+      172875,
+      171798,
+      173138
+    ],
+    "failures": []
+  },
+  {
+    "layout": "rings",
+    "cutoff": 0.25,
+    "ranking": "cycle",
+    "start_seed": 0,
+    "seeds": 8,
+    "mean_moves": 196482.75,
+    "median_moves": 196816.5,
+    "moves": [
+      204146,
+      197560,
+      195654,
+      199655,
+      196073,
+      186658,
+      192691,
+      199425
+    ],
+    "failures": []
+  }
+]
