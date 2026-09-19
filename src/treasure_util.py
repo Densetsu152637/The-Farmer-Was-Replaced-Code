@@ -65,44 +65,51 @@ def pop_return_path():
 	return None
 
 
+def maze_disappeared():
+	# Bush, grass, and empty tiles all mean another drone ended the maze.
+	entity = get_entity_type()
+	return entity != Entities.Hedge and entity != Entities.Treasure
+
+
 def maze_branch_worker(first_direction=None, blocked=None):
-	# Each drone owns its visited set. Pass ancestor visits explicitly so a
-	# child cannot turn back into work already assigned above its fork.
+	# Copied ancestor visits keep children inside their assigned subtree.
+	if maze_disappeared():
+		return
 	visited = dict()
 	if blocked != None:
 		visited = dict(blocked)
 	visited[get_current_key()] = True
 	path = []
-	handles = []
-	prefixes = []
-	best_route = None
-	failed = False
 	if first_direction != None:
-		if not move(first_direction):
-			return None
-		path.append(first_direction)
-	branch_depth = len(path)
+		if maze_disappeared() or not move(first_direction):
+			return
 
 	while True:
+		entity = get_entity_type()
+		if entity != Entities.Hedge and entity != Entities.Treasure:
+			return
+		if entity == Entities.Treasure:
+			harvest()
+			return
 		visited[get_current_key()] = True
-		if get_entity_type() == Entities.Treasure:
-			best_route = list(path)
-			break
 		choices = []
 		for direction in directions:
 			target = get_target_key(direction)
 			if target not in visited and can_move(direction):
 				choices.append((direction, target))
 
-		# Keep one branch for this drone; delegate siblings at the junction.
+		# Keep the first exit. Rejected siblings remain unvisited so normal
+		# DFS picks them up when this drone backtracks to the junction.
 		for index in range(1, len(choices)):
+			if maze_disappeared():
+				return
 			direction, target = choices[index]
 			child = spawn_drone(maze_branch_worker, direction, visited)
 			if child != None:
-				handles.append(child)
-				prefixes.append(list(path))
 				visited[target] = True
 
+		if maze_disappeared():
+			return
 		if len(choices) > 0:
 			direction, target = choices[0]
 			if move(direction):
@@ -111,26 +118,12 @@ def maze_branch_worker(first_direction=None, blocked=None):
 				visited[target] = True
 			continue
 
-		# The branch is exhausted. Leave the caller's junction untouched.
-		if len(path) == branch_depth:
-			break
+		# Do not join descendants or return to the spawn tile: finishing
+		# this subtree immediately releases a drone slot for another fork.
+		if len(path) == 0:
+			return
 		if not move(back_direction(path.pop())):
-			failed = True
-			break
-
-	# Never destroy the maze while any descendant is still navigating it.
-	for index in range(len(handles)):
-		result = wait_for(handles[index])
-		if result != None and best_route == None:
-			best_route = prefixes[index] + result
-	# Every worker returns to its spawn position, even after a local find.
-	while len(path) > 0:
-		if not move(back_direction(path.pop())):
-			failed = True
-			break
-	if failed:
-		return None
-	return best_route
+			return
 
 
 def maze_substance_cost():
@@ -159,17 +152,12 @@ def create_maze():
 
 
 def solve_maze():
-	# Search without harvesting, then follow the winning route after all joins.
-	if get_entity_type() != Entities.Hedge and get_entity_type() != Entities.Treasure:
-		return False
-	route = maze_branch_worker()
-	if route == None:
-		return False
-	for direction in route:
-		if not move(direction):
-			return False
-	if get_entity_type() != Entities.Treasure:
+	if maze_disappeared():
 		return False
 	before = num_items(Items.Gold)
-	harvest()
+	maze_branch_worker()
+	# Only the main drone waits. Descendants may outlive their parents;
+	# drain all of them before the policy can create the next maze.
+	while num_drones() > 1:
+		pass
 	return num_items(Items.Gold) > before

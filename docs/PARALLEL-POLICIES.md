@@ -11,7 +11,7 @@ The entrypoint in `src/main.py` selects one resource policy at a time. Each poli
 | Pumpkins | Disjoint square-block planting and readiness/repair ownership | All worker results join before a single giant harvest; failed planting aborts. |
 | Cactus | Parallel planting, then row-sort barrier, then column-sort barrier | No worker overlaps a row/column phase. |
 | Weird Substance | Explicit disjoint grass production bands | Fertilizer-only workers join; no maze/bush/cache/color mutation. |
-| Treasure | One fresh full-field maze; workers dynamically delegate extra DFS exits at encountered junctions | Workers return routes and backtrack without harvesting; parent joins all and harvests once. |
+| Treasure | One fresh full-field maze; workers dynamically delegate extra DFS exits at encountered junctions | Parent keeps one exit and explores rejected spawns with ordinary DFS. Exhausted workers exit immediately; the finder harvests and other workers stop on non-maze tiles. Main drone drains all workers before the next maze. |
 | Dinosaur | Parallel farm reset/preparation; one parent dinosaur state machine | The Dinosaurs documentation states only one drone may wear the Dinosaur Hat, so one parent snake is an engine constraint; preparation remains parallel. |
 
 `util.run_parallel_regions()` partitions equal square blocks when the world size
@@ -30,7 +30,7 @@ rejection executes inline, while every accepted handle is joined before return. 
 rows, columns, or maze branches; dynamic treasure DFS remains bespoke because
 each junction decides its next jobs from live maze state.
 
-The game documentation confirms copied worker arguments/no shared memory, `None` on drone capacity, and shared-tile race conditions. Fresh mazes are acyclic; treasure workers therefore branch-search and never mutate the maze. Reusing a maze creates loops and is outside this policy model.
+The game documentation confirms copied worker arguments/no shared memory, `None` on drone capacity, and shared-tile race conditions. Fresh mazes are acyclic; treasure workers therefore search separate subtrees until the finder harvests. Bush, grass, or empty tiles signal cancellation without shared memory. Reusing a maze creates loops and is outside this policy model.
 
 The test harness in `tests/` mocks movement, inventory, worker handles, and joins. It validates ownership and phase ordering; live game growth timing, inventory contention, and maze geometry still require in-game verification.
 

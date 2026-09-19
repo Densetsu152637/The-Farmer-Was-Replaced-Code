@@ -115,7 +115,7 @@ def pumpkin_policy():
 def cactus_policy():
     
 	def cactus_plant_region(region):
-		util.action_per_region(planting.farm_carrot_tile, region)
+		util.action_per_region(planting.farm_cactus, region)
     
 	while util.lacks_item(Items.Cactus) and sufficient_power():
 		# Step 1: Plant the entire grid with cactus
@@ -150,10 +150,10 @@ def weird_substance_policy():
 			break
 
 
-# in-progress	
+# finished
 def treasure_policy():
 	# Repeat complete create/search/join/harvest runs until the gold target.
-	while util.lacks_item(Items.Gold) and not util.has_some(Items.Weird_Substance) and util.has_some(Items.Fertilizer) and sufficient_power():
+	while util.lacks_item(Items.Gold) and not util.lacks_item(Items.Weird_Substance) and util.has_some(Items.Fertilizer) and sufficient_power():
 		if not treasure_util.create_maze():
 			return False
 		if not treasure_util.solve_maze():
