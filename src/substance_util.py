@@ -1,115 +1,84 @@
 import util
 
-STATE_NEED_PLANT = 0
-STATE_NEED_INFECT = 1
-STATE_PERFECT = 2
 
-# Global dictionary tracking mechanism.
-infected_cache = dict()
-
-def get_key(x, y):
-	#Returns the flattened string key required by the game engine.
-	return str(x) + "_" + str(y)
-
-def clear_cache_at_current():
-	#Call this immediately whenever you harvest a tile to keep cache accurate.
-	global infected_cache
-	coord_key = get_key(get_pos_x(), get_pos_y())
-	if coord_key in infected_cache:
-		infected_cache.pop(coord_key)
-
-def get_weird_substance_requirement():
-	global infected_cache
-	current_entity = get_entity_type()
-	coord_key = get_key(get_pos_x(), get_pos_y())
-
-	if current_entity == None:
-		if coord_key in infected_cache:
-			infected_cache.pop(coord_key)
-		return STATE_NEED_PLANT
-
-	if current_entity == Entities.Bush:
-		if coord_key in infected_cache and infected_cache[coord_key] == True:
-			return STATE_PERFECT
-		else:
-			return STATE_NEED_INFECT
-
-	return STATE_NEED_PLANT
-
-def current_tile_matches(target_state):
-	global infected_cache
-	current_entity = get_entity_type()
-	coord_key = get_key(get_pos_x(), get_pos_y())
-
-	is_cached_infected = False
-	if coord_key in infected_cache:
-		is_cached_infected = infected_cache[coord_key]
-
-	if target_state == STATE_NEED_PLANT:
-		return current_entity == None
-	if target_state == STATE_NEED_INFECT:
-		return current_entity == Entities.Bush and not is_cached_infected
-	if target_state == STATE_PERFECT:
-		return current_entity == Entities.Bush and is_cached_infected
-	return False
-
-def plant_dynamic(target_state):
-	global infected_cache
-	current_entity = get_entity_type()
-	x, y = get_pos_x(), get_pos_y()
-	coord_key = get_key(x, y)
-
-	is_cached_infected = False
-	if coord_key in infected_cache:
-		is_cached_infected = infected_cache[coord_key]
-
-	# Pass 1: Plant if bare
-	if target_state == STATE_NEED_PLANT or current_entity == None:
-		if coord_key in infected_cache:
-			infected_cache.pop(coord_key)
-		plant(Entities.Bush)
-		current_entity = Entities.Bush
-
-	# Pass 2: Infect using optimization mechanics
-	if target_state == STATE_NEED_INFECT or not is_cached_infected:
-		if current_entity == Entities.Bush:
-			# OPTIMIZATION: If we have Weird Substance available, use it instead of precious Fertilizer!
-			if num_items(Items.Weird_Substance) > 0:
-				use_item(Items.Weird_Substance)
-
-				# CRITICAL FIX: Weird Substance toggles the current plant AND all 4 neighbors.
-				# We must mirror this cross-mutation logic inside our memory grid!
-				coords_to_toggle = [(x, y), (x+1, y), (x-1, y), (x, y+1), (x, y-1)]
-				for cx, cy in coords_to_toggle:
-					k = get_key(cx, cy)
-					# Toggle the boolean state in cache
-					if k in infected_cache:
-						infected_cache[k] = not infected_cache[k]
-					else:
-						infected_cache[k] = True
-			else:
-				# Fallback to Fertilizer if we are completely out of Weird Substance
-				use_item(Items.Fertilizer)
-				infected_cache[coord_key] = True
+def cross_tiles(centre):
+    size = get_world_size()
+    x = centre[0] % size
+    y = centre[1] % size
+    return [
+        (x, y),
+        (x, (y + 1) % size),
+        ((x + 1) % size, y),
+        (x, (y - 1) % size),
+        ((x - 1) % size, y),
+    ]
 
 
-def substance_worker(region):
-	x0, y0, x1, y1 = region
-	for x in range(x0, x1):
-		for y in range(y0, y1):
-			util.go_to(x, y)
-			if get_entity_type() != Entities.Grass:
-				if get_entity_type() != None:
-					harvest()
-				util.till_if_required(Grounds.Grassland)
-			if not use_item(Items.Fertilizer):
-				return None
-			started = get_time()
-			while not can_harvest() and get_time() - started < 30:
-				if num_items(Items.Fertilizer) == 0 and get_time() - started > 10:
-					return None
-			if not can_harvest():
-				return None
-			harvest()
-	return True
+def generate_cross_centres():
+    # Greedily reserve complete crosses, including across wrapped edges.
+    # This is a deterministic maximal packing, not necessarily a maximum one.
+    size = get_world_size()
+    centres = []
+    if size < 3:
+        return centres
+    occupied = set()
+    for y in range(size):
+        for x in range(size):
+            tiles = cross_tiles((x, y))
+            overlaps = False
+            for tile in tiles:
+                if tile in occupied:
+                    overlaps = True
+            if not overlaps:
+                centres.append((x, y))
+                for tile in tiles:
+                    occupied.add(tile)
+    return centres
 
+
+def substance_needed():
+    return util.lacks_item(Items.Weird_Substance) and not util.shortage_of(Items.Power)
+
+
+def wait_for_grass():
+    while not can_harvest():
+        if not substance_needed():
+            return False
+    return substance_needed()
+
+
+def substance_cross_action(centre):
+    if get_world_size() < 3 or not substance_needed():
+        return
+    tiles = cross_tiles(centre)
+    # Remove old plants (including possibly infected grass), so toggling
+    # infection always starts from healthy grass and never creates a maze.
+    for tile in tiles:
+        if not substance_needed():
+            return
+        util.go_to_coord(tile)
+        harvest()
+        util.till_if_required(Grounds.Grassland)
+
+    while substance_needed():
+        # All five plants must exist and be mature before infecting the cross.
+        for tile in tiles:
+            util.go_to_coord(tile)
+            if not wait_for_grass():
+                return
+        util.go_to_coord(tiles[0])
+        if num_items(Items.Weird_Substance) > 0:
+            if not use_item(Items.Weird_Substance):
+                return
+            # Finish the whole infected batch even if another drone reaches
+            # the target meanwhile. Never toggle leftover infected grass.
+            for tile in tiles:
+                util.go_to_coord(tile)
+                harvest()
+        else:
+            # Bootstrap with even a single fertilizer; no reserve is needed.
+            if num_items(Items.Fertilizer) < 1:
+                return
+            if not use_item(Items.Fertilizer):
+                return
+            harvest()

@@ -135,25 +135,17 @@ def cactus_policy():
 		harvest()
 		
   
-# in-progress	
+# finished
 def weird_substance_policy():
-	while util.lacks_item(Items.Weird_Substance) and util.has_some(Items.Fertilizer) and sufficient_power():
-		results = util.parallel_map(substance_util.substance_worker,
-			util.region_bounds(max_drones()))
-		failed = False
-		for result in results:
-			if result == None:
-				failed = True
-				break
-		util.reposition()
-		if failed:
-			break
-
+    # Fertilizer harvests are independent per tile, so partition the farm into
+	# disjoint regions and keep every available drone busy. 
+	centres = substance_util.generate_cross_centres()
+	util.parallel_map(substance_util.substance_cross_action, centres)
 
 # finished
 def treasure_policy():
 	# Repeat complete create/search/join/harvest runs until the gold target.
-	while util.lacks_item(Items.Gold) and not util.lacks_item(Items.Weird_Substance) and util.has_some(Items.Fertilizer) and sufficient_power():
+	while util.lacks_item(Items.Gold) and util.has_some(Items.Weird_Substance) and sufficient_power():
 		if not treasure_util.create_maze():
 			return False
 		if not treasure_util.solve_maze():

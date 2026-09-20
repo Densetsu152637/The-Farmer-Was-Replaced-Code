@@ -225,9 +225,6 @@ def generate_regions(n):
 	# Remainders are distributed over the first segments on each axis.
 	if n < 1:
 		n = 1
-	available = max_drones()
-	if n > available:
-		n = available
 	size = get_world_size()
 	if n > size * size:
 		n = size * size
