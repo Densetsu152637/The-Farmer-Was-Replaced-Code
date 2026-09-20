@@ -9,7 +9,7 @@ import dino_util
 import heap
 
 def sufficient_power():
-	return not util.shortage_of(Items.Power)
+	return util.has_some(Items.Power)
 
 
 # finished

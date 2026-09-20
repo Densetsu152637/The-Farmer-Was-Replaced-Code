@@ -1,5 +1,19 @@
 TARGET_ITEMS = {}
-MIN_ITEM = 10000
+MIN_ITEM = 100000
+# Relative effort per missing item, not measured farming times. Includes rough
+# input/setup effort and limited parallelism for treasure and dinosaurs.
+UPGRADE_ITEM_WEIGHTS = {
+	Items.Hay: 1,
+	Items.Wood: 2,
+	Items.Carrot: 3,
+	Items.Power: 4,
+	Items.Pumpkin: 5,
+	Items.Cactus: 6,
+	Items.Weird_Substance: 8,
+	Items.Gold: 12,
+	Items.Bone: 20
+}
+
 ALL_FARMABLE_ITEMS = [
 	Items.Hay,
 	Items.Wood,

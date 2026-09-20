@@ -37,7 +37,7 @@ def generate_cross_centres():
 
 
 def substance_needed():
-    return util.lacks_item(Items.Weird_Substance) and not util.shortage_of(Items.Power)
+    return util.lacks_item(Items.Weird_Substance) and util.has(Items.Power)
 
 
 def wait_for_grass():
