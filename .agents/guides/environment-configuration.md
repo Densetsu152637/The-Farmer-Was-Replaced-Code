@@ -8,4 +8,8 @@ Keep credentials out of source control, command examples, shell history, logs, a
 
 For services that need secrets, prefer the consuming project's supported secret mechanism and least-privilege access. Compose secrets are mounted into service containers and are distinct from ordinary environment variables; their source and availability depend on the configuration and deployment context. Do not assume that local Compose secrets have the same protection properties as an external production secret manager.
 
-References: [Compose environment variables](https://docs.docker.com/compose/how-tos/environment-variables/), [variable interpolation](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/), [Compose secrets](https://docs.docker.com/compose/how-tos/use-secrets/), [Docker Engine Swarm secrets](https://docs.docker.com/engine/swarm/secrets/).
+References:
+[Compose environment variables](https://docs.docker.com/compose/how-tos/environment-variables/)
+[variable interpolation](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
+[Compose secrets](https://docs.docker.com/compose/how-tos/use-secrets/)
+[Docker Engine Swarm secrets](https://docs.docker.com/engine/swarm/secrets/).

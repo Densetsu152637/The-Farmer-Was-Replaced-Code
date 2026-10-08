@@ -2,35 +2,39 @@
 
 ## Apply these rules
 
-- Read applicable `AGENTS.md` instructions, relevant `docs/` READMEs, nearby code/tests, and formatter/linter/build configuration before editing.
-- Follow established project and framework conventions. The language defaults below guide new code where no stronger local convention exists; do not rewrite working code into a different paradigm without task justification.
-- Make the smallest cohesive change that satisfies the requirements. Favor clarity and explicit contracts over fewest lines, speculative abstractions, or broad cleanup.
+- Follow established project and framework conventions.
+- The language defaults below guide new code where no stronger local convention exists; do not rewrite working code into a different paradigm without task justification.
+- Make the smallest cohesive change that satisfies the requirements.
+- Favor clarity and explicit contracts over fewest lines, speculative abstractions, or broad cleanup.
 
 ## Language defaults
 
-FP = functional programming; OOP/OOD = object-oriented programming/design. Languages may combine paradigms; choose idiomatic constructs for the problem.
+FP = functional programming
+OOP = object-oriented programming
+DOD = data-oriented design
+Languages may combine paradigms; choose idiomatic constructs for the problem.
 
 | Language                | Default paradigm and emphasis                                                                             |
 | ----------------------- | --------------------------------------------------------------------------------------------------------- |
 | Haskell                 | FP; pure transformations, algebraic data types, explicit effects                                          |
-| C++                     | OOP/OOD with value semantics, RAII, composition, and generic algorithms                                   |
-| C                       | Procedural/structured; explicit data ownership, lifetimes, and cleanup                                    |
-| C# / Java               | OOP/OOD; cohesive types, interfaces at boundaries, composition                                            |
-| TypeScript / JavaScript | Functional composition for transformations; modules/components; classes for meaningful state or lifecycle |
+| C++                     | OOP/DOD with value semantics, RAII, composition, and generic algorithms and templates                     |
+| C                       | DOD; Procedural/structured; explicit data ownership, lifetimes, and cleanup                               |
+| C# / Java               | OOP; cohesive types, interfaces at boundaries, composition                                                |
+| TypeScript / JavaScript | FP; Functional composition for transformations; modules/components; OOP for meaningful state or lifecycle |
 | Python                  | Procedural/functional core; classes for domain state and behavior; idiomatic iteration                    |
-| Rust                    | Ownership-oriented, data-oriented design; structs/enums/traits and functional iterators                   |
+| Rust                    | DOD; Ownership-oriented, structs/enums/traits and functional iterators                                    |
 | Go                      | Procedural composition; small interfaces, explicit errors and concurrency ownership                       |
-| Kotlin / Swift          | OOP plus functional/value-oriented design; idiomatic framework conventions                                |
+| Kotlin / Swift          | OOP + functional/value-oriented design; idiomatic framework conventions                                   |
 | F# / OCaml / Scala      | FP-first; algebraic modeling and explicit effects; idiomatic interop                                      |
 | SQL                     | Declarative, set-based queries; explicit joins, constraints, and transactions                             |
 | Shell / PowerShell      | Procedural orchestration; small commands/functions, quoted paths, explicit failure handling               |
 
-For unlisted languages, follow their ecosystem and local conventions. Prefer local, controlled mutation when it makes an algorithm clearer or more efficient; avoid hidden shared mutable state. Pure functions and immutability improve reasoning, but do not inherently guarantee performance.
+For unlisted languages, follow their ecosystem and local conventions. Prefer local, controlled mutation when it makes an algorithm clearer or more efficient; avoid hidden shared mutable state. Pure functions and immutability improve reasoning and are preferred for FP, but do not inherently guarantee performance.
 
 ## Functions
 
 - Give each function one coherent responsibility and a name that describes its intent. Keep control flow shallow and readable; extract helpers when they isolate a meaningful concept, repeated behavior, or testable boundary.
-- Make inputs, outputs, effects, and failure behavior explicit. Prefer pure transformations for business rules; keep I/O and orchestration at clear boundaries. Do not introduce hidden global dependencies.
+- Make inputs, outputs, effects, and failure behavior explicit. Prefer pure transformations for business rules and server logic; keep I/O and orchestration at clear boundaries. Do not introduce hidden global dependencies.
 - Use typed/named parameter groups when arguments become ambiguous. Avoid boolean mode flags and long positional argument lists where separate operations or a meaningful options type are clearer.
 - Validate untrusted input at boundaries. Handle empty, invalid, and missing values deliberately; preserve distinctions that matter to the domain instead of inventing silent defaults.
 - Use composition, currying, and higher-order functions where idiomatic and helpful. Do not force currying, one-line functions, recursion, or chained expressions when straightforward control flow reads better.
@@ -60,9 +64,9 @@ For unlisted languages, follow their ecosystem and local conventions. Prefer loc
 - Prevent stale or cancelled requests from overwriting current state, including error and loading state. Use cancellation plus a current-request/lifecycle guard where cancellation alone cannot guarantee this.
 - Validate HTTP status, decoding, and application-level success according to the endpoint contract. Reuse shared request helpers; do not introduce a second `Result`/`Either` framework for routine requests when existing Promise/error composition suffices.
 
-### Existing web-app helper conventions
+### Existing helper conventions
 
-When working in a project containing `web-app/src/shared/pathways.ts` and `web-app/src/lib/connector.ts`, inspect and use those shared helpers and preserve connector rejections. Use `clientErrorMessage(error, fallback)` and `reportClientError(error, context)` where defined for safe messages and development diagnostics, following the configured `@shared/pathways` import alias.
+Inspect and use shared helpers and preserve connector rejections.
 
 React effects must handle their background promises and cancel in-flight work on cleanup. Ignore expected cleanup aborts; guard state updates from superseded requests, including updates in `finally`. Event handlers must handle awaited connector failures; use `void` in JSX only when the invoked handler handles its own rejection. Verify these helper paths/APIs exist; do not assume every project contains this web-app or copy missing helpers blindly.
 

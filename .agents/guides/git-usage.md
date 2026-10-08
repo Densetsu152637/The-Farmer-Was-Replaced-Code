@@ -2,7 +2,7 @@
 
 ## Scope and preflight
 
-Follow applicable `AGENTS.md` instructions and explicit user constraints. These rules govern Git operations; they do not authorize publishing, merging, or contacting reviewers outside the task's authorized scope.
+These rules govern Git operations; they do not authorize publishing, merging, or contacting reviewers outside the task's authorized scope.
 
 Before edits or Git mutations:
 
@@ -18,8 +18,8 @@ Before edits or Git mutations:
 - Prefer the host's managed-worktree tools when available and follow their lifecycle rules. Otherwise use Git worktrees. Each worker runs commands with an explicit working directory or `git -C` pointing to its assigned worktree.
 - Worktrees isolate files and indexes, but share repository metadata and refs. Never check out the same branch in multiple worktrees with force options. Coordinate branch/ref mutations and repository-wide configuration or maintenance through one owner. Avoid global Git configuration changes.
 - Start independent streams from an agreed committed base. New worktrees do not contain another checkout's uncommitted changes. Transfer required changes explicitly as reviewed commits or a scoped patch, with ownership and user changes preserved.
-- Assign one writer per file within a checkout. Across worktrees, avoid overlapping file/API changes where possible; establish contracts and serialize changes to shared schemas, lockfiles, migrations, or interfaces when they would conflict during integration.
 - Isolate build outputs, ports, test databases, generated artifacts, and temporary paths too. A worktree does not isolate external services. Serialize tests that mutate the same resource.
+- Before doing work in parallel, see if there are overlapping file/API changes and contracts, as these can be serialised before parallel work starts. Serialize changes to shared schemas, lockfiles, migrations, or interfaces when they would conflict during integration.
 
 CLI example, after resolving the actual paths and base commit (replace all placeholders; do not execute them literally):
 
